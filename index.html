@@ -1,16 +1,175 @@
-﻿<!DOCTYPE html>
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <title>Runner Phaser</title>
+        <script src="//cdn.jsdelivr.net/phaser/2.5.0/phaser.min.js"></script>
+    </head>
+    <body>
 
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <title>TypeScript HTML App</title>
-    <link rel="stylesheet" href="app.css" type="text/css" />
-    <script src="phaser.js"></script>
-    <script src="app.js"></script>
-</head>
-<body>
-    <h1>TypeScript HTML App</h1>
+    <script type="text/javascript">
 
-    <div id="content"></div>
-</body>
+    window.onload = function() {
+    	var GAME_WIDTH = 800;
+    	var GAME_HEIGHT = 600;
+    	var DELTA_TIME = 0.06;
+
+        var game = new Phaser.Game(GAME_WIDTH, GAME_HEIGHT, Phaser.AUTO, '', { preload: preload, create: create, update: update});
+
+        var player;
+        var isJumping = false;
+
+        var score = 0;
+
+        var floor1, floor2;
+        var invisibleFloor;
+        var cloudGroup;
+        var obstacleGroup;
+
+
+        var scoreTxt;
+
+        var currentCactus = 0;
+        var timerSpawn = 0;
+        var allowToMove = true;
+
+        gameSpeed = 5;
+
+        var gameOver = false;
+        var gameOverTxt;
+        var restartTxt;
+
+        function preload () {
+
+            game.load.image('player', 'player_placeholder.png');
+            game.load.image('floor', 'floor_placeholder.png');
+            game.load.image('cloud', 'cloud.png');
+            game.load.image('cactus_small', 'cactus_small.png');
+            game.load.image('cactus_medium', 'cactus_medium.png');
+            game.load.image('cactus_big', 'cactus_big.png');
+        }
+
+        function create () {
+        	floor1 = game.add.sprite(0,400, 'floor');
+        	floor2 = game.add.sprite(800,400, 'floor');
+        	invisibleFloor = game.add.sprite(0,510, 'floor');
+        	invisibleFloor.alpha = 0;
+
+        	game.physics.arcade.enable(invisibleFloor);
+        	invisibleFloor.body.immovable = true;
+
+            player = game.add.sprite(200, 450, 'player');
+            game.physics.arcade.enable(player);
+
+            player.body.gravity.y = 9.8;
+            player.body.collideWorldBounds = true;
+
+            cloudGroup = game.add.group();
+
+            for (var i = 0; i < 4; i++) {
+            	cloudGroup.create(GAME_WIDTH / i, GAME_HEIGHT * 0.1 + 10 * i, 'cloud');
+            }
+            
+            obstacleGroup = game.add.group();
+            obstacleGroup.enableBody = true;
+
+            var cactusSmall = obstacleGroup.create(GAME_WIDTH + 32, 482, 'cactus_small');
+            var cactusMedium = obstacleGroup.create(GAME_WIDTH + 32, 466, 'cactus_medium');
+            var cactusBig = obstacleGroup.create(GAME_WIDTH + 32, 450, 'cactus_big');
+
+            scoreTxt = game.add.text(GAME_WIDTH / 2.2, 16 , '0',{ fontSize: '32px', fill: '#ffffff'});
+            gameOverTxt = game.add.text(GAME_WIDTH / 3.5, GAME_HEIGHT / 2.5, '',{fontSize: '64px', fill: '#ffffff'});
+            restartTxt = game.add.text(GAME_WIDTH / 2.3, GAME_HEIGHT / 1.9, '',{fontSize: '16px', fill: '#ffffff'});
+        }
+
+        function update(){
+        	var isColliding = game.physics.arcade.collide(player, invisibleFloor);
+        	var isCollidingWithCactus = game.physics.arcade.overlap(player, obstacleGroup, playerVsCactus, null, this);
+
+        	if(gameOver){
+        		gameOverTxt.text = 'Game Over';
+        		restartTxt.text = 'Press R to restart';
+
+        		if(game.input.keyboard.isDown(Phaser.KeyCode.R)){
+        			gameOver = false;
+        			gameOverTxt.text = '';
+        			restartTxt.text = ''
+
+        			score = 0;
+        			gameSpeed = 5;
+        			allowToMove = true;
+        			timerSpawn = 0;
+        			currentCactus = 0;
+
+        			for (var i = 0; i < obstacleGroup.children.length; i++) {
+	    			obstacleGroup.children[i].x = GAME_WIDTH + 64;
+    				}
+        		}
+        		return;
+        	}
+
+        	score += DELTA_TIME;
+
+        	scoreTxt.text = Number((score).toFixed(2));
+
+        	if(game.input.keyboard.isDown(Phaser.Keyboard.SPACEBAR) && isJumping == false){
+        		isJumping = true;
+        		player.body.velocity.y = -800;
+        	}
+
+        	if(isColliding)
+        		isJumping = false;
+
+        	if(game.input.keyboard.isDown(Phaser.Keyboard.S))
+        		player.body.gravity.y = 6000;
+        	else
+        		player.body.gravity.y = 3000;
+
+        	if(floor1.x <= -800)
+        		floor1.x = 800;
+        	if(floor2.x <= -800)
+        		floor2.x = 800;
+        	floor1.x -= gameSpeed;
+        	floor2.x -= gameSpeed;
+
+        	gameSpeed += DELTA_TIME * 0.25;
+
+        	if(allowToMove){
+        		obstacleGroup.children[currentCactus].x -= gameSpeed;
+        	}
+
+    		if(obstacleGroup.children[currentCactus].x <= -32){
+    			obstacleGroup.children[currentCactus].x = GAME_WIDTH + 32;
+    			currentCactus = game.rnd.integerInRange(0,2);
+    			allowToMove = false;
+    			timerSpawn = game.rnd.integerInRange(0,10);
+    		}
+
+    		if(!allowToMove){
+    			timerSpawn -= DELTA_TIME;
+
+    			if(timerSpawn <= 0)
+    				allowToMove = true;
+    		}
+
+    		if(gameSpeed >= 20)
+    			gameSpeed = 20;
+
+    		for (var i = 0; i < cloudGroup.children.length; i++) {
+    			cloudGroup.children[i].x -= gameSpeed / 4;
+    			if(cloudGroup.children[i].x <= -64)
+    				cloudGroup.children[i].x = GAME_WIDTH + 64;
+    		}
+
+    		function playerVsCactus(player, cactus){
+    			gameOver = true;
+    		}
+
+        }
+
+    };
+
+    </script>
+
+    </body>
 </html>
